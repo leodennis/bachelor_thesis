@@ -12,6 +12,9 @@ import java.io.IOException;
 import java.util.*;
 
 /**
+ *
+ * Old class, only used as reference!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ *
  * Class to read in data for best rebate prediction. Provides test and training data.
  * @author Leo Knoll
  */
@@ -151,8 +154,7 @@ public class MyDataSetIterator implements DataSetIterator {
             input.putScalar(new int[] {i, 3, day}, (curData.getRebate() - minArray[3]) / (maxArray[3] - minArray[3]));
 
             // output (labels)
-            label.putScalar(new int[] {i, 0, day}, (curData.getSalesRebate() - minArray[4]) / (maxArray[4] - minArray[4]));
-            label.putScalar(new int[] {i, 1, day}, (curData.getSalesWithout() - minArray[5]) / (maxArray[5] - minArray[5]));
+            label.putScalar(new int[] {i, 0, day}, (curData.getSales() - minArray[4]) / (maxArray[4] - minArray[4]));
         }
 
         currentIterationElement += actualMiniBatchSize;
@@ -233,9 +235,8 @@ public class MyDataSetIterator implements DataSetIterator {
             input.putScalar(new int[] {0, 3, day}, (rebateData.getRebate() - minArray[3]) / (maxArray[3] - minArray[3]));
 
             // output (labels)
-            label.putScalar(new int[] {0, 0, 0}, rebateData.getSalesRebate()); //save in {0, 0, 0} for easy recovery
-            label.putScalar(new int[] {0, 1, 0}, rebateData.getSalesWithout()); //save in {0, 1, 0} for easy recovery
-            //label.putScalar(new int[] {0, 1, 1}, day); // also save day
+            label.putScalar(new int[] {0, 0, 0}, rebateData.getSales()); //save in {0, 0, 0} for easy recovery
+            //label.putScalar(new int[] {0, 0, 1}, day); // also save day
 
             test.add(new Pair<>(input, label));
         }
@@ -307,8 +308,7 @@ public class MyDataSetIterator implements DataSetIterator {
                     if (nums[i] < minArray[i]) minArray[i] = nums[i];
                 }
 
-                stockDataList.add(new RebateData(Integer.valueOf(arr[0]), Integer.valueOf(arr[1]), Long.valueOf(arr[2])/1000, Double.valueOf(arr[3]), Integer.valueOf(arr[4]),
-                    Integer.valueOf(arr[5])));
+                stockDataList.add(new RebateData(Integer.valueOf(arr[0]), Integer.valueOf(arr[1]), Long.valueOf(arr[2])/1000, Double.valueOf(arr[3]), Integer.valueOf(arr[4])));
 
             }
 

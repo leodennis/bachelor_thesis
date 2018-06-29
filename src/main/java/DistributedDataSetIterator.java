@@ -6,8 +6,8 @@ import java.util.Random;
  */
 public class DistributedDataSetIterator extends SingleDataSetIterator{
 
-    public DistributedDataSetIterator(String dataFilePath, String delimiter, int inputDays, double splitRatio, String model, boolean addMissingDays, int skipFirstLines) {
-        super(dataFilePath, delimiter, inputDays, splitRatio, model, addMissingDays, skipFirstLines);
+    public DistributedDataSetIterator(String dataFilePath, String delimiter, int inputDays, double splitRatio, String model, boolean addMissingDays, int skipFirstLines, boolean average) {
+        super(dataFilePath, delimiter, inputDays, splitRatio, model, addMissingDays, skipFirstLines, average);
     }
 
     @Override

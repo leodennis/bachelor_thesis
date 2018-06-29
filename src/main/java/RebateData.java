@@ -1,10 +1,8 @@
 /**
  * Class representing a single line of input data.
  *
- * Data format of input file must be MODEL;MODELYEAR;INVOICEDATE;RABATT;MIT_RABATT;OHNE_RABATT
- *  with RABATT be the rebate of the day in percent (not in any currency!!)
- *  with MIT_RABATT be the sales with that rebate on the day
- *  with OHNE_RABATT be the sales without rebate on that day
+ * Data format of input file must be MODEL;MODELYEAR;INVOICEDATE;REBATE;SALES
+ *  with RABATT being the rebate of the day in percent (not in any currency!!)
  * The data has to be ordered by INVOICEDATE, MODEL, MODELYEAR
  *
  * @author Leo Knoll
@@ -15,21 +13,19 @@ public class RebateData {
     private int year;
     private long date;
     private double rebate;
-    private int salesRebate;
-    private int salesWithout;
+    private int sales;
 
 
     public RebateData() {
 
     }
 
-    public RebateData(int name, int year, long date, double rebate, int salesRebate, int salesWithout) {
+    public RebateData(int name, int year, long date, double rebate, int sales) {
         this.name = name;
         this.year = year;
         this.date = date;
         this.rebate = rebate;
-        this.salesRebate = salesRebate;
-        this.salesWithout = salesWithout;
+        this.sales = sales;
     }
 
 
@@ -67,25 +63,17 @@ public class RebateData {
         this.rebate = rebate;
     }
 
-    public int getSalesRebate() {
-        return salesRebate;
+    public int getSales() {
+        return sales;
     }
 
-    public void setSalesRebate(int salesRebate) {
-        this.salesRebate = salesRebate;
-    }
-
-    public int getSalesWithout() {
-        return salesWithout;
-    }
-
-    public void setSalesWithout(int salesWithout) {
-        this.salesWithout = salesWithout;
+    public void setSales(int sales) {
+        this.sales = sales;
     }
 
     @Override
     public String toString() {
         return "Name: " + name + ", Year: " + year + ", Date: " + date
-            + ", Rebate: " + rebate + ", Sales: " + salesRebate + " / " + salesWithout;
+            + ", Rebate: " + rebate + ", Sales: " + sales;
     }
 }

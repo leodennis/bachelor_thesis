@@ -13,8 +13,7 @@ import org.nd4j.linalg.activations.Activation;
 import org.nd4j.linalg.lossfunctions.LossFunctions;
 
 /**
- * Created by zhanghao on 26/7/17.
- * @author ZHANG HAO
+ * Class representing the neural network.
  */
 public class RecurrentNets {
 
@@ -78,7 +77,7 @@ public class RecurrentNets {
 
         MultiLayerNetwork net = new MultiLayerNetwork(conf);
         net.init();
-        net.setListeners(new ScoreIterationListener(100));
+        net.setListeners(new ScoreIterationListener(1));
         return net;
     }
 }

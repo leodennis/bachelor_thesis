@@ -1,3 +1,4 @@
+import com.google.common.collect.EvictingQueue;
 import com.opencsv.CSVReader;
 import javafx.util.Pair;
 import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
@@ -18,8 +19,8 @@ public class SingleDataSetIterator extends RebateDataSetIterator{
     // mini-batch-size offsets
     private LinkedList<Integer> exampleStartOffsets = new LinkedList<>();
 
-    public SingleDataSetIterator(String dataFilePath, String delimiter, int inputDays, double splitRatio, String model, boolean addMissingDays, int skipFirstLines) {
-        super(dataFilePath, delimiter, inputDays, splitRatio, model, addMissingDays, skipFirstLines);
+    public SingleDataSetIterator(String dataFilePath, String delimiter, int inputDays, double splitRatio, String model, boolean addMissingDays, int skipFirstLines, boolean average) {
+        super(dataFilePath, delimiter, inputDays, splitRatio, model, addMissingDays, skipFirstLines, average);
     }
 
     @Override
@@ -69,8 +70,7 @@ public class SingleDataSetIterator extends RebateDataSetIterator{
 
                 curData = trainDataList.get(i + 1);
 
-                label.putScalar(new int[] {index, 0, c}, (curData.getSalesRebate() - minArray[4]) / (maxArray[4] - minArray[4]));
-                label.putScalar(new int[] {index, 1, c}, (curData.getSalesWithout() - minArray[5]) / (maxArray[5] - minArray[5]));
+                label.putScalar(new int[] {index, 0, c}, (curData.getSales() - minArray[4]) / (maxArray[4] - minArray[4]));
             }
 
             if (exampleStartOffsets.size() == 0) break;
@@ -101,7 +101,10 @@ public class SingleDataSetIterator extends RebateDataSetIterator{
     protected List<Pair<INDArray, INDArray>> generateTestDataSet (List<RebateData> stockDataList) {
     	int window = inputDays + 1;
     	List<Pair<INDArray, INDArray>> test = new ArrayList<>();
-    	for (int i = 0; i < stockDataList.size() - window; i++) {
+
+        //EvictingQueue<Double> averages = EvictingQueue.create(inputDays);
+
+        for (int i = 0; i < stockDataList.size() - window; i++) {
     		INDArray input = Nd4j.create(new int[] {inputDays, INPUT_VECTOR_SIZE}, 'f');
     		for (int j = i; j < i + inputDays; j++) {
     			RebateData stock = stockDataList.get(j);
@@ -113,8 +116,7 @@ public class SingleDataSetIterator extends RebateDataSetIterator{
             RebateData stock = stockDataList.get(i + inputDays);
             INDArray label;
             label = Nd4j.create(new int[]{OUTPUT_VECTOR_SIZE}, 'f'); // ordering is set as 'f', faster construct
-            label.putScalar(new int[] {0}, stock.getSalesRebate());
-            label.putScalar(new int[] {1}, stock.getSalesWithout());
+            label.putScalar(new int[] {0}, stock.getSales());
 
     		test.add(new Pair<>(input, label));
     	}
@@ -133,16 +135,15 @@ public class SingleDataSetIterator extends RebateDataSetIterator{
 
             // String replacer replaces each string with a unique number
             StringReplacer modelReplacer = new StringReplacer(INPUT_VECTOR_SIZE + OUTPUT_VECTOR_SIZE,
-                new int[] {StringReplacer.TYPE_STRING, StringReplacer.TYPE_NUMBER, StringReplacer.TYPE_NUMBER, StringReplacer.TYPE_NUMBER, StringReplacer.TYPE_NUMBER, StringReplacer.TYPE_NUMBER});
+                new int[] {StringReplacer.TYPE_STRING, StringReplacer.TYPE_NUMBER, StringReplacer.TYPE_NUMBER, StringReplacer.TYPE_NUMBER, StringReplacer.TYPE_NUMBER});
 
             List<String[]> list = new CSVReader(new FileReader(filename), ';').readAll(); // load all elements in a list
             RebateData lastData = null;
             for (String[] arr : list) {
-                if (!arr[0].equals(model)) continue;
+                if (!arr[INDEX_MODEL].equals(model)) continue;
 
                 String[] replacedData = modelReplacer.replace(arr);   // replace Strings
                 replacedData = modelReplacer.fillNullOrEmpty(replacedData, "0", true); //replace empty number fields
-
 
                 double[] nums = new double[INPUT_VECTOR_SIZE + OUTPUT_VECTOR_SIZE];
                 for (int i = 0; i < replacedData.length; i++) {
@@ -156,16 +157,15 @@ public class SingleDataSetIterator extends RebateDataSetIterator{
 
                 if (lastData != null) {
                     // if there are two rebates in one day
-                    if (lastData.getName() == Integer.valueOf(replacedData[0]) && lastData.getDate() == Long.valueOf(replacedData[2])/1000) {
-                        lastData.setRebate((lastData.getRebate() + Double.valueOf(replacedData[3])) / 2);        // average
-                        lastData.setSalesRebate(lastData.getSalesRebate() + Integer.valueOf(replacedData[4]));   // add sales
+                    if (lastData.getName() == Integer.valueOf(replacedData[INDEX_MODEL]) && lastData.getDate() == Long.valueOf(replacedData[INDEX_DATE])/1000) {
+                        lastData.setRebate((lastData.getRebate() + Double.valueOf(replacedData[INDEX_REBATE])) / 2);    // average
+                        lastData.setSales(lastData.getSales() + Integer.valueOf(replacedData[INDEX_SALES]));            // add sales
                         continue;
                     }
-
                 }
 
-                lastData = new RebateData(Integer.valueOf(replacedData[0]), Integer.valueOf(replacedData[1]), Long.valueOf(replacedData[2])/1000,
-                    Double.valueOf(replacedData[3]), Integer.valueOf(replacedData[4]), Integer.valueOf(replacedData[5]));
+                lastData = new RebateData(Integer.valueOf(replacedData[INDEX_MODEL]), Integer.valueOf(replacedData[INDEX_YEAR]), Long.valueOf(replacedData[INDEX_DATE])/1000,
+                    Double.valueOf(replacedData[INDEX_REBATE]), Integer.valueOf(replacedData[INDEX_SALES]));
 
                 rebateDataList.add(lastData);
             }
@@ -178,8 +178,8 @@ public class SingleDataSetIterator extends RebateDataSetIterator{
                 final int UNIX_TIMESTAMP_DAY = 24*60*60; // 86400 sec.
                 for (RebateData data : rebateDataList) {
                     while (minDate + UNIX_TIMESTAMP_DAY <= data.getDate()) {
-                        missingDates.add(new RebateData(data.getName(), data.getYear(), minDate, 0, 0, 0));
-                        minArray[3 - 1] = 0;
+                        missingDates.add(new RebateData(data.getName(), data.getYear(), minDate, 0, 0));
+                        minArray[INDEX_SALES] = 0;
                         minDate += UNIX_TIMESTAMP_DAY;
                         missedDates++;
                     }
@@ -187,7 +187,7 @@ public class SingleDataSetIterator extends RebateDataSetIterator{
                 }
                 RebateData data = rebateDataList.get(rebateDataList.size()-1);
                 while (data.getDate() + UNIX_TIMESTAMP_DAY <= maxDate) {
-                    data = new RebateData(data.getName(), data.getYear(), data.getDate() + UNIX_TIMESTAMP_DAY, 0, 0, 0);
+                    data = new RebateData(data.getName(), data.getYear(), data.getDate() + UNIX_TIMESTAMP_DAY, 0, 0);
                     missingDates.add(data);
                     missedDates++;
                 }
@@ -230,45 +230,25 @@ public class SingleDataSetIterator extends RebateDataSetIterator{
         INDArray[] predicts = new INDArray[test.size()];
         INDArray[] actuals = new INDArray[test.size()];
 
-
-        List<Integer> lastPredictsWith = new ArrayList<>();
-        List<Integer> lastPredictsWithout = new ArrayList<>();
-
         INDArray min = Nd4j.create(getMinArray());
         INDArray max = Nd4j.create(getMaxArray());
 
         for (int i = 0; i < test.size(); i++) {
             predicts[i] = net.rnnTimeStep(test.get(i).getKey()).getRow(inputDays - 1).mul(max.sub(min)).add(min);
-            lastPredictsWith.add(0, predicts[i].getInt(0));
-            lastPredictsWithout.add(0, predicts[i].getInt(1));
-
             actuals[i] = test.get(i).getValue();
         }
         log.info("Print out Predictions and Actual Values...");
         log.info("Predict\tActual");
         for (int i = 0; i < predicts.length; i++) log.info(predicts[i] + "\t" + actuals[i]);
+
         log.info("Plot...");
-        for (int n = 0; n < 3; n++) {
-            double[] pred = new double[predicts.length];
-            double[] actu = new double[actuals.length];
-            for (int i = 0; i < predicts.length; i++) {
-                if (n == 2) {
-                    pred[i] = predicts[i].getDouble(0) + predicts[i].getDouble(1);
-                    actu[i] = actuals[i].getDouble(0) + actuals[i].getDouble(1);
-                } else {
-                    pred[i] = predicts[i].getDouble(n);
-                    actu[i] = actuals[i].getDouble(n);
-                }
-            }
-            String name;
-            switch (n) {
-                case 0: name = "Sales with Rebate"; break;
-                case 1: name = "Sales Without"; break;
-                case 2: name = "Total Sales"; break;
-                default: throw new NoSuchElementException();
-            }
-            PlotUtil.plot(pred, actu, name);
+        double[] pred = new double[predicts.length];
+        double[] actu = new double[actuals.length];
+        for (int i = 0; i < predicts.length; i++) {
+            pred[i] = predicts[i].getDouble(0);
+            actu[i] = actuals[i].getDouble(0);
         }
+        PlotUtil.plot(pred, actu, "Total Sales");
 
     }
 }

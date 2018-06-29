@@ -11,13 +11,17 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowEvent;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Calendar;
 import java.util.stream.Stream;
 
+/**
+ * View to set parameters for rebate prediction and to train and test predictions.
+ *
+ * @author Leo Knoll
+ */
 class NADIN_Prediction_View extends JFrame implements ActionListener, DocumentListener, ProgressBarView {
 
     public static final String DELIMITER = ";";
@@ -37,7 +41,9 @@ class NADIN_Prediction_View extends JFrame implements ActionListener, DocumentLi
     private JTextField txtDays = new JTextField("22");
     private JCheckBox cbTrain = new JCheckBox("Train network", true);
     private JCheckBox cbFill = new JCheckBox("Add missing days", false);
-    private JLabel lblModel = new JLabel("Select the model you want the prediction for (select input file first):");
+    private JCheckBox cbAverage = new JCheckBox("Average testing with using results of all input days", true);
+    private JCheckBox cbClasses = new JCheckBox("Train on car classes", true);
+    private JLabel lblModel = new JLabel("Select the model/class you want the prediction for (select input file first):");
     private JComboBox<String> comboModel = new JComboBox<>();
     private JLabel lblIterator = new JLabel("Train network on:");
     private JComboBox<String> comboIterator = new JComboBox<>(new String[]{"Only selected model", "Only model distributed", "Complete dataset"});
@@ -79,17 +85,19 @@ class NADIN_Prediction_View extends JFrame implements ActionListener, DocumentLi
         setPosition(txtDays, 0,7,4,1,1,0);
         setPosition(cbTrain, 0,8,4,1,1,0);
         setPosition(cbFill, 0,9,4,1,1,0);
-        setPosition(lblModel, 0,10,4,1,1,0);
-        setPosition(comboModel, 0,11,4,1,1,0);
-        setPosition(lblIterator, 0,12,4,1,1,0);
-        setPosition(comboIterator, 0,13,4,1,1,0);
-        setPosition(lblSave, 0,14,4,1,1,0);
-        setPosition(txtSave, 0,15,3,1,1,0);
-        setPosition(butBrowseSave, 3,15,1,1,0,0);
-        setPosition(butCancel, 0,16,1,1,0,0);
-        setPosition(butStart, 3,16,1,1,0,0);
-        setPosition(lblProgress, 0,17,4,1,1,0);
-        setPosition(progressBar, 0,18,4,1,1,0);
+        setPosition(cbAverage, 0,10,4,1,1,0);
+        setPosition(cbClasses, 0,11,4,1,1,0);
+        setPosition(lblModel, 0,12,4,1,1,0);
+        setPosition(comboModel, 0,13,4,1,1,0);
+        setPosition(lblIterator, 0,14,4,1,1,0);
+        setPosition(comboIterator, 0,15,4,1,1,0);
+        setPosition(lblSave, 0,16,4,1,1,0);
+        setPosition(txtSave, 0,17,3,1,1,0);
+        setPosition(butBrowseSave, 3,17,1,1,0,0);
+        setPosition(butCancel, 0,18,1,1,0,0);
+        setPosition(butStart, 3,18,1,1,0,0);
+        setPosition(lblProgress, 0,19,4,1,1,0);
+        setPosition(progressBar, 0,20,4,1,1,0);
     }
 
     /**
@@ -136,6 +144,10 @@ class NADIN_Prediction_View extends JFrame implements ActionListener, DocumentLi
                 name.append("no-adding").append("_");
             }
 
+            if (cbAverage.isSelected()) {
+                name.append("avg").append("_");
+            }
+
             name.append(txtPercent.getText()).append("_");
             name.append(txtDays.getText());
         }
@@ -144,7 +156,9 @@ class NADIN_Prediction_View extends JFrame implements ActionListener, DocumentLi
 
     public boolean updateProgress(int progressPercentage, long timeLeft) {
         progressBar.setValue(progressPercentage);
-        lblProgress.setText("Estimated finish in: " + getTimeAsString(timeLeft));
+        if (timeLeft > 1000) { // because sometimes the first epoch finishes too fast
+            lblProgress.setText("Estimated finish in: " + getTimeAsString(timeLeft));
+        }
         return canceled;
     }
 
@@ -153,14 +167,7 @@ class NADIN_Prediction_View extends JFrame implements ActionListener, DocumentLi
         if (e.getSource().equals(butBrowseInput)) {
             JFileChooser chooser = new JFileChooser();
             chooser.setDialogTitle("Select input file");
-            int success = chooser.showOpenDialog(null);
-            if (success == JFileChooser.APPROVE_OPTION) {
-                txtInput.setText(chooser.getSelectedFile().getAbsolutePath());
-            }
-        } else if (e.getSource().equals(butBrowseInput)) {
-            JFileChooser chooser = new JFileChooser();
-            chooser.setDialogTitle("Select input file");
-            int success = chooser.showOpenDialog(null);
+            int success = chooser.showOpenDialog(this);
             if (success == JFileChooser.APPROVE_OPTION) {
                 txtInput.setText(chooser.getSelectedFile().getAbsolutePath());
             }
@@ -170,13 +177,13 @@ class NADIN_Prediction_View extends JFrame implements ActionListener, DocumentLi
             if (cbTrain.isSelected()) {
                 chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
             }
-            int success = chooser.showOpenDialog(null);
+            int success = chooser.showOpenDialog(this);
             if (success == JFileChooser.APPROVE_OPTION) {
                 txtSave.setText(chooser.getSelectedFile().getAbsolutePath());
             }
         } else if (e.getSource().equals(butStart)) {
             // check inputs
-            // TODO: Check with Preconditions.checkArgument(expression whichg must be true, error string, printf style objects);
+            // TODO: Check with Preconditions.checkArgument(expression which must be true, error string, printf style objects);
             if (txtInput.getText().trim().isEmpty()) {
                 JOptionPane.showMessageDialog(this,"No input file selected!", "Error", JOptionPane.ERROR_MESSAGE);
                 return;
@@ -230,12 +237,14 @@ class NADIN_Prediction_View extends JFrame implements ActionListener, DocumentLi
             }
 
             // disable all but cancel button
+            // TODO: does not work...
             for (Component cp : this.getComponents() ){
                 if (cp != butCancel && cp != progressBar) {
                     cp.setEnabled(false);
                 }
             }
 
+            // start worker process
             new TrainAndTestNetwork(this).execute();
 
         } else if (e.getSource().equals(butCancel)) {
@@ -316,7 +325,6 @@ class NADIN_Prediction_View extends JFrame implements ActionListener, DocumentLi
             this.listener = listener;
         }
 
-
         @Override
         protected Void doInBackground() throws IOException{
             String inputPath = txtInput.getText();
@@ -324,20 +332,20 @@ class NADIN_Prediction_View extends JFrame implements ActionListener, DocumentLi
             double splitRatio = Double.valueOf(txtPercent.getText());
             int inputDays = Integer.valueOf(txtDays.getText());
             boolean addMissingDays = cbFill.isSelected();
+            boolean average = cbAverage.isSelected();
             String selectedModel = comboModel.getSelectedItem().toString();
             File locationToSave = new File(txtSave.getText());
 
-            log.info("Selected model: " + selectedModel);
+            log.info("Selected model or class: " + selectedModel);
 
             log.info("Create dataSet iterator...");
             RebateDataSetIterator iterator;
             if (comboIterator.getSelectedIndex() == 0) {
-                iterator = new SingleDataSetIterator(inputPath, DELIMITER,inputDays, splitRatio, selectedModel, addMissingDays,FIRST_LINES_TO_SKIP);
+                iterator = new SingleDataSetIterator(inputPath, DELIMITER,inputDays, splitRatio, selectedModel, addMissingDays,FIRST_LINES_TO_SKIP, average);
             } else if(comboIterator.getSelectedIndex() == 1) {
-                iterator = new DistributedDataSetIterator(inputPath, DELIMITER,inputDays, splitRatio, selectedModel, addMissingDays,FIRST_LINES_TO_SKIP);
+                iterator = new DistributedDataSetIterator(inputPath, DELIMITER,inputDays, splitRatio, selectedModel, addMissingDays,FIRST_LINES_TO_SKIP, average);
             } else {
-                iterator = new SeparatedDataSetIterator(inputPath, DELIMITER, splitRatio, selectedModel, addMissingDays,
-                    FIRST_LINES_TO_SKIP);
+                iterator = new SeparatedDataSetIterator(inputPath, DELIMITER, splitRatio, selectedModel, addMissingDays, FIRST_LINES_TO_SKIP, average);
             }
 
             MultiLayerNetwork net;
@@ -347,9 +355,10 @@ class NADIN_Prediction_View extends JFrame implements ActionListener, DocumentLi
                 net = RecurrentNets.buildLstmNetworks(iterator.inputColumns(), iterator.totalOutcomes(), iterator.getInputDays());
 
                 log.info("Training...");
-                log.info("Using " + iterator.getClass().getName() + " to train " + epochs + " epochs!");
+                log.info("Using " + iterator.getClass().getSimpleName() + " to train " + epochs + " epochs!");
 
-                // TODO: Set calculated finishing time here
+                // set initial pre calculated time (most likely not accurate but better than nothing)
+                listener.updateProgress(0, (long) (iterator.totalExamples() * epochs * 7));
 
                 long lastEpochFinishing = Calendar.getInstance().getTimeInMillis();
                 EvictingQueue<Double> lastFinishedEpochs = EvictingQueue.create(10);
@@ -369,12 +378,13 @@ class NADIN_Prediction_View extends JFrame implements ActionListener, DocumentLi
 
                     // calculate time for epoch to finish
                     double diff = Calendar.getInstance().getTimeInMillis() - lastEpochFinishing;
-                    lastFinishedEpochs.add(diff);
+                    if (diff > 1000) { // because sometimes the first epoch finishes too fast
+                        lastFinishedEpochs.add(diff);
+                    }
                     // average with last 10 results
                     diff = lastFinishedEpochs.stream().mapToDouble(e -> e).average().orElse(0.0);
                     // compute estimated finish time
                     long completion_in = (long) diff *(epochs - i);
-
                     if (listener.updateProgress((int) i*100/epochs, completion_in)) {
                         return null; // cancel
                     }

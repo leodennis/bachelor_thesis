@@ -20,13 +20,12 @@ public abstract class RebateDataSetIterator implements DataSetIterator {
 
     // number of inputs (features) and outputs (labels) for each rebate data
     protected final int INPUT_VECTOR_SIZE = 4;
-    protected final int OUTPUT_VECTOR_SIZE = 2;
+    protected final int OUTPUT_VECTOR_SIZE = 1;
     protected final int INDEX_MODEL = 0;
     protected final int INDEX_YEAR = 1;
     protected final int INDEX_DATE = 2;
     protected final int INDEX_REBATE = 3;
-    protected final int INDEX_SALES_WITH = 4;
-    protected final int INDEX_SALES_WITHOUT = 5;
+    protected final int INDEX_SALES = 4;
 
     // data lists
     protected List<RebateData> allData;
@@ -47,6 +46,8 @@ public abstract class RebateDataSetIterator implements DataSetIterator {
 
     protected int inputDays;
 
+    protected boolean average;
+
     /** minimal values of each feature in stock dataset */
     protected double[] minArray = new double[INPUT_VECTOR_SIZE + OUTPUT_VECTOR_SIZE];
     /** maximal values of each feature in stock dataset */
@@ -63,12 +64,13 @@ public abstract class RebateDataSetIterator implements DataSetIterator {
      * @param addMissingDays if missing dates should be added with zeros
      * @param skipFirstLines the number of lines which have to be skipped at the beginning
      */
-    public RebateDataSetIterator(String dataFilePath, String delimiter, int inputDays, double splitRatio, String model, boolean addMissingDays, int skipFirstLines) {
-        Objects.requireNonNull(model, "Path to data cannot be null!");
-        Objects.requireNonNull(model, "Delimiter cannot be null!");
-        Objects.requireNonNull(model, "Model is null, you must select a model for testing!");
+    public RebateDataSetIterator(String dataFilePath, String delimiter, int inputDays, double splitRatio, String model, boolean addMissingDays, int skipFirstLines, boolean average) {
+        Objects.requireNonNull(dataFilePath, "Path to data cannot be null!");
+        Objects.requireNonNull(delimiter, "Delimiter cannot be null!");
+        Objects.requireNonNull(model, "Model is null, you must select a model or class for testing!");
 
         this.inputDays = inputDays;
+        this.average = average;
 
         // read all input data
         allData = readRebateDataFromFile(dataFilePath, delimiter, model, addMissingDays, skipFirstLines);
@@ -92,16 +94,14 @@ public abstract class RebateDataSetIterator implements DataSetIterator {
     abstract void initializeTraining();
 
     protected double[] getMaxArray() {
-        double[] arr = new double[2];
-        arr[0] = maxArray[INDEX_SALES_WITH];
-        arr[1] = maxArray[INDEX_SALES_WITHOUT];
+        double[] arr = new double[1];
+        arr[0] = maxArray[INDEX_SALES];
         return arr;
     }
 
     protected double[] getMinArray() {
-        double[] arr = new double[2];
-        arr[0] = minArray[INDEX_SALES_WITH];
-        arr[1] = minArray[INDEX_SALES_WITHOUT];
+        double[] arr = new double[1];
+        arr[0] = minArray[INDEX_SALES];
         return arr;
     }
 

@@ -28,8 +28,8 @@ public class SeparatedDataSetIterator extends RebateDataSetIterator {
     private Map<Integer, List<RebateData>> separatedData = new HashMap<>();
     private List<Integer> modelList = new ArrayList<>();
 
-    public SeparatedDataSetIterator(String dataFilePath, String delimiter, double splitRatio, String model, boolean addMissingDays, int skipFirstLines) {
-        super(dataFilePath, delimiter, 1, splitRatio, model, addMissingDays, skipFirstLines);
+    public SeparatedDataSetIterator(String dataFilePath, String delimiter, double splitRatio, String model, boolean addMissingDays, int skipFirstLines, boolean average) {
+        super(dataFilePath, delimiter, 1, splitRatio, model, addMissingDays, skipFirstLines, average);
     }
 
     @Override
@@ -99,8 +99,7 @@ public class SeparatedDataSetIterator extends RebateDataSetIterator {
             input.putScalar(new int[] {i, 3, 0}, (curData.getRebate() - minArray[3]) / (maxArray[3] - minArray[3]));
 
             // output (labels)
-            label.putScalar(new int[] {i, 0, 0}, (curData.getSalesRebate() - minArray[4]) / (maxArray[4] - minArray[4]));
-            label.putScalar(new int[] {i, 1, 0}, (curData.getSalesWithout() - minArray[5]) / (maxArray[5] - minArray[5]));
+            label.putScalar(new int[] {i, 0, 0}, (curData.getSales() - minArray[4]) / (maxArray[4] - minArray[4]));
         }
 
         currentIterationElement += actualMiniBatchSize;
@@ -120,7 +119,13 @@ public class SeparatedDataSetIterator extends RebateDataSetIterator {
         return new DataSet(input, label);
     }
 
-    @Override public int totalExamples() { return 0; }      // TODO: Implement this method
+    @Override public int totalExamples() {
+        int cnt = 0;
+        for (int n : trainingMiniBatchSizes) {
+            cnt += n;
+        }
+        return cnt;
+    }
 
     @Override public int inputColumns() { return INPUT_VECTOR_SIZE; }
 
@@ -189,8 +194,7 @@ public class SeparatedDataSetIterator extends RebateDataSetIterator {
             input.putScalar(new int[] {0, 3, 0}, (rebateData.getRebate() - minArray[3]) / (maxArray[3] - minArray[3]));
 
             // output (labels)
-            label.putScalar(new int[] {0, 0, 0}, rebateData.getSalesRebate()); //save in {0, 0, 0} for easy recovery
-            label.putScalar(new int[] {0, 1, 0}, rebateData.getSalesWithout()); //save in {0, 1, 0} for easy recovery
+            label.putScalar(new int[] {0, 0, 0}, rebateData.getSales()); //save in {0, 0, 0} for easy recovery
 
             test.add(new Pair<>(input, label));
         }
@@ -220,7 +224,7 @@ public class SeparatedDataSetIterator extends RebateDataSetIterator {
 
             // String replacer replaces each string with a unique number
             StringReplacer modelReplacer = new StringReplacer(INPUT_VECTOR_SIZE + OUTPUT_VECTOR_SIZE,
-                new int[] {StringReplacer.TYPE_STRING, StringReplacer.TYPE_NUMBER, StringReplacer.TYPE_NUMBER, StringReplacer.TYPE_NUMBER, StringReplacer.TYPE_NUMBER, StringReplacer.TYPE_NUMBER});
+                new int[] {StringReplacer.TYPE_STRING, StringReplacer.TYPE_NUMBER, StringReplacer.TYPE_NUMBER, StringReplacer.TYPE_NUMBER, StringReplacer.TYPE_NUMBER});
 
             List<String[]> list = new ArrayList<>();
             BufferedReader reader = new BufferedReader(new FileReader(new File(filename)));
@@ -256,8 +260,7 @@ public class SeparatedDataSetIterator extends RebateDataSetIterator {
             for (String[] arr : list) {
                 lineNumber++;
                 if (lineNumber >= separationLine) {
-                    RebateData data = new RebateData(Integer.valueOf(arr[0]), Integer.valueOf(arr[1]), Long.valueOf(arr[2])/1000, Double.valueOf(arr[3]), Integer.valueOf(arr[4]),
-                        Integer.valueOf(arr[5]));
+                    RebateData data = new RebateData(Integer.valueOf(arr[0]), Integer.valueOf(arr[1]), Long.valueOf(arr[2])/1000, Double.valueOf(arr[3]), Integer.valueOf(arr[4]));
                     if (data.getName() == filterID) {
                         testDataList.add(data);
                     }
@@ -274,8 +277,7 @@ public class SeparatedDataSetIterator extends RebateDataSetIterator {
                     if (nums[i] < minArray[i]) minArray[i] = nums[i];
                 }
 
-                RebateData data = new RebateData(Integer.valueOf(arr[0]), Integer.valueOf(arr[1]), Long.valueOf(arr[2])/1000, Double.valueOf(arr[3]), Integer.valueOf(arr[4]),
-                    Integer.valueOf(arr[5]));
+                RebateData data = new RebateData(Integer.valueOf(arr[0]), Integer.valueOf(arr[1]), Long.valueOf(arr[2])/1000, Double.valueOf(arr[3]), Integer.valueOf(arr[4]));
 
                 // add to map
                 if (separatedData.get(data.getName()) == null) {
@@ -296,7 +298,7 @@ public class SeparatedDataSetIterator extends RebateDataSetIterator {
                     if (m != null) {
                         for (RebateData data : dateList) {
                             while (minDate + 24*60*60 <= data.getDate()) {
-                                missingDates.add(new RebateData(data.getName(), data.getYear(), minDate, 0, 0, 0));
+                                missingDates.add(new RebateData(data.getName(), data.getYear(), minDate, 0, 0));
                                 minArray[3] = 0;
                                 minArray[4] = 0;
                                 minArray[5] = 0;
@@ -305,7 +307,7 @@ public class SeparatedDataSetIterator extends RebateDataSetIterator {
                         }
                         RebateData data = dateList.get(dateList.size()-1);
                         while (data.getDate() + 24*60*60 <= maxDate) {
-                            data = new RebateData(data.getName(), data.getYear(), data.getDate() + 24*60*60, 0, 0, 0);
+                            data = new RebateData(data.getName(), data.getYear(), data.getDate() + 24*60*60, 0, 0);
                             missingDates.add(data);
                         }
                         dateList.addAll(missingDates);
@@ -340,12 +342,8 @@ public class SeparatedDataSetIterator extends RebateDataSetIterator {
 
     @Override
     void testPrediction(MultiLayerNetwork net) {
-        double[] predictedSalesRebate = new double[test.size()];
-        double[] predictedSalesWithout = new double[test.size()];
-        double[] predictedSalesTotal = new double[test.size()];
-        double[] actualSalesRebate = new double[test.size()];
-        double[] actualSalesWithout = new double[test.size()];
-        double[] actualSalesTotal = new double[test.size()];
+        double[] predictedSales = new double[test.size()];
+        double[] actualSales = new double[test.size()];
 
         double min[] = getMinArray();
         double max[] = getMaxArray();
@@ -355,46 +353,13 @@ public class SeparatedDataSetIterator extends RebateDataSetIterator {
             INDArray actuals = test.get(i).getValue();
             int day = 0; //actuals.getInt(0, 1, 1); // recover day
 
-            predictedSalesRebate[i] = predicts.getDouble(0, 0, day) * (max[0] - min[0]) + min[0];
-            predictedSalesWithout[i] = predicts.getDouble(0, 1, day) * (max[1] - min[1]) + min[1];
+            predictedSales[i] = predicts.getDouble(0, 0, day) * (max[0] - min[0]) + min[0];
 
-            actualSalesRebate[i] = actuals.getInt(0, 0, 0);
-            actualSalesWithout[i] = actuals.getInt(0, 1, 0);
-
-            predictedSalesTotal[i] = predictedSalesRebate[i] + predictedSalesWithout[i];
-            actualSalesTotal[i] = actualSalesRebate[i] + actualSalesWithout[i];
-        }
-
-        log.info("Print out Predictions and Actual Values...");
-        log.info("Predict, Actual");
-        for (int i = 0; i < actualSalesTotal.length; i++) {
-            log.info(predictedSalesTotal[i] + ", " + actualSalesTotal[i]);
+            actualSales[i] = actuals.getInt(0, 0, 0);
         }
 
         log.info("Plot...");
-        for (int n = 0; n < 3; n++) {
-            double[] predicts;
-            double[] actuals;
-            String name;
-            switch (n) {
-                case 0:
-                    predicts = predictedSalesRebate;
-                    actuals = actualSalesRebate;
-                    name = "Sales with Rebate";
-                    break;
-                case 1:
-                    predicts = predictedSalesWithout;
-                    actuals = actualSalesWithout;
-                    name = "Sales Without";
-                    break;
-                case 2:
-                    predicts = predictedSalesTotal;
-                    actuals = actualSalesTotal;
-                    name = "Sales Total";
-                    break;
-                default: throw new NoSuchElementException();
-            }
-            PlotUtil.plot(predicts, actuals, name);
-        }
+        PlotUtil.plot(predictedSales, actualSales, "Total Sales");
+
     }
 }
