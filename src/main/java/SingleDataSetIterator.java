@@ -226,29 +226,56 @@ public class SingleDataSetIterator extends RebateDataSetIterator{
     // ---------------------------------------------- Testing ---------------------------------------------------------
 
     @Override
-    void testPrediction(MultiLayerNetwork net) {
-        INDArray[] predicts = new INDArray[test.size()];
+    void testPrediction(MultiLayerNetwork net, boolean average, boolean showResult) {
+        INDArray[][] predicts = new INDArray[test.size()][inputDays];
         INDArray[] actuals = new INDArray[test.size()];
 
         INDArray min = Nd4j.create(getMinArray());
         INDArray max = Nd4j.create(getMaxArray());
 
+        CustomAverager avg = new CustomAverager(inputDays);
+
         for (int i = 0; i < test.size(); i++) {
-            predicts[i] = net.rnnTimeStep(test.get(i).getKey()).getRow(inputDays - 1).mul(max.sub(min)).add(min);
+            for (int j = 0; j < inputDays; j++) {
+                predicts[i][j] = net.rnnTimeStep(test.get(i).getKey()).getRow(j).mul(max.sub(min)).add(min);
+            }
             actuals[i] = test.get(i).getValue();
         }
-        log.info("Print out Predictions and Actual Values...");
-        log.info("Predict\tActual");
-        for (int i = 0; i < predicts.length; i++) log.info(predicts[i] + "\t" + actuals[i]);
 
-        log.info("Plot...");
-        double[] pred = new double[predicts.length];
-        double[] actu = new double[actuals.length];
-        for (int i = 0; i < predicts.length; i++) {
-            pred[i] = predicts[i].getDouble(0);
-            actu[i] = actuals[i].getDouble(0);
+        if (showResult) {
+            log.info("Print out Predictions and Actual Values...");
+            log.info("Predict\tActual");
+            for (int i = 0; i < predicts.length; i++) log.info(predicts[i] + "\t" + actuals[i]);
+
+            log.info("Plot...");
+            double[] pred = new double[predicts.length];
+            double[] actu = new double[actuals.length];
+            if (average) {
+                int offsetCounter = 0;
+                for (int i = 0; i < predicts.length + inputDays-1; i++) { // -1 ????
+                    if (i < predicts.length) {
+                        for (int j = 0; j < inputDays; j++) {
+                            avg.addDay(j, predicts[i][j].getDouble(0));
+                        }
+                    }
+                    if (offsetCounter == inputDays-1) {
+                        pred[i - offsetCounter] = avg.getAverage();
+                    } else {
+                        offsetCounter++;
+                    }
+                    avg.nextIteration();
+                    if (i < predicts.length) {
+                        actu[i] = actuals[i].getDouble(0);
+                    }
+                }
+            } else {
+                for (int i = 0; i < predicts.length; i++) {
+                    pred[i] = predicts[i][inputDays - 1].getDouble(0);
+                    actu[i] = actuals[i].getDouble(0);
+                }
+            }
+            log.info("Showing Plot!");
+            PlotUtil.plot(pred, actu, "Total Sales" + ((average)? " - AVG" : ""), "Test Results");
         }
-        PlotUtil.plot(pred, actu, "Total Sales");
-
     }
 }

@@ -1,6 +1,9 @@
 import com.google.common.collect.EvictingQueue;
+import org.apache.log4j.BasicConfigurator;
 import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
 import org.deeplearning4j.util.ModelSerializer;
+import org.nd4j.linalg.api.ndarray.INDArray;
+import org.nd4j.linalg.factory.Nd4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,7 +89,7 @@ class NADIN_Prediction_View extends JFrame implements ActionListener, DocumentLi
         setPosition(cbTrain, 0,8,4,1,1,0);
         setPosition(cbFill, 0,9,4,1,1,0);
         setPosition(cbAverage, 0,10,4,1,1,0);
-        setPosition(cbClasses, 0,11,4,1,1,0);
+        //setPosition(cbClasses, 0,11,4,1,1,0);
         setPosition(lblModel, 0,12,4,1,1,0);
         setPosition(comboModel, 0,13,4,1,1,0);
         setPosition(lblIterator, 0,14,4,1,1,0);
@@ -142,10 +145,6 @@ class NADIN_Prediction_View extends JFrame implements ActionListener, DocumentLi
                 name.append("adding").append("_");
             } else {
                 name.append("no-adding").append("_");
-            }
-
-            if (cbAverage.isSelected()) {
-                name.append("avg").append("_");
             }
 
             name.append(txtPercent.getText()).append("_");
@@ -404,12 +403,38 @@ class NADIN_Prediction_View extends JFrame implements ActionListener, DocumentLi
             net = ModelSerializer.restoreMultiLayerNetwork(locationToSave);
 
             log.info("Testing...");
-            iterator.testPrediction(net);
+            iterator.testPrediction(net, average, true);
 
             listener.updateProgress(100, 0);
 
             log.info("Done...");
 
+            log.info("Predict future");
+
+            try {
+                // testing rebates: 0%, 5%, 10%, 15%, 20%, 25%, 30%
+                int predictDays = 10;
+                double results[][] = new double[30 / 5 + 1][predictDays];
+                for (int r = 0; r <= 30; r += 5) {
+                    INDArray[] rebates = new INDArray[predictDays];
+                    for (int i = 0; i < predictDays; i++) {
+                        INDArray input = Nd4j.create(new int[]{inputDays, RebateDataSetIterator.INPUT_VECTOR_SIZE}, 'f');
+                        for (int j = 0; j < inputDays; j++) {
+                            input.putScalar(new int[]{j, 0}, (iterator.getAllData().get(iterator.getAllData().size() - 1).getName() - iterator.minArray[0]) / (iterator.maxArray[0] - iterator.minArray[0]));
+                            input.putScalar(new int[]{j, 1}, (iterator.getAllData().get(iterator.getAllData().size() - 1).getYear() - iterator.minArray[1]) / (iterator.maxArray[1] - iterator.minArray[1]));
+                            input.putScalar(new int[]{j, 2}, (iterator.getAllData().get(iterator.getAllData().size() - 1).getDate() + (i + 1) * 60 * 60 * 24 - iterator.minArray[2]) / (iterator.maxArray[2] - iterator.minArray[2]));
+                            input.putScalar(new int[]{j, 3}, (r - iterator.minArray[3]) / (iterator.maxArray[3] - iterator.minArray[3]));
+                        }
+                        rebates[i] = input;
+                    }
+                    net = ModelSerializer.restoreMultiLayerNetwork(locationToSave);
+                    iterator.testPrediction(net, average, false);
+                    results[r / 5] = iterator.predictFutureSales(net, rebates);
+                }
+                PlotUtil.plot(results, new String[]{"0%", "5%", "10%", "15%", "20%", "25%", "30%"}, "Total Sales", "Prediction Results");
+            }catch(Exception e) {
+                e.printStackTrace();
+                }
             return null;
         }
     }
@@ -424,6 +449,8 @@ class NADIN_Prediction_View extends JFrame implements ActionListener, DocumentLi
         } catch (Exception e) {
             // did not work, ignore
         }
+
+        BasicConfigurator.configure();
 
         new NADIN_Prediction_View().setVisible(true);
     }

@@ -8,28 +8,34 @@ import java.util.List;
  */
 public class CustomAverager {
     private int days;
-    private List<List<Integer>> savedNumbers;
+    private List<List<Double>> savedNumbers;
 
     public CustomAverager(int days) {
         this.days = days;
-        savedNumbers = new ArrayList<>();
+        savedNumbers = new ArrayList<>(this.days);
     }
 
-    public void addDay(int day, int number) {
-        if (day > savedNumbers.size()) {
-            List<Integer> list = new ArrayList<>();
+    public void addDay(int day, double number) {
+        if (day >= savedNumbers.size()) {
+            List<Double> list = new ArrayList<>();
             list.add(number);
             savedNumbers.add(list);
+        } else {
+            savedNumbers.get(day).add(number);
         }
     }
 
     public double getAverage() {
         double avg = 0;
-        List<Integer> list = savedNumbers.get(days - 1);
-        for (int number : list) {
+        List<Double> list = savedNumbers.get(0);
+        for (double number : list) {
             avg += number;
         }
         return avg / list.size();
+    }
+
+    public void nextIteration() {
+        savedNumbers.remove(0);
     }
 
 }

@@ -6,13 +6,108 @@
 
     <groupId>NADIN_Rebate_Prediction</groupId>
     <artifactId>NADIN_Rebate_Prediction</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.9.1</version>
+    <packaging>pom</packaging>
 
-    <parent>
-        <groupId>org.deeplearning4j</groupId>
-        <artifactId>deeplearning4j-examples-parent</artifactId>
-        <version>0.9.1</version>
-    </parent>
+    <name>DeepLearning4j Examples Parent</name>
+    <description>Examples of training different data sets</description>
+    <properties>
+        <!-- Change the nd4j.backend property to nd4j-cuda-7.5-platform or nd4j-cuda-8.0-platform to use CUDA GPUs -->
+        <nd4j.backend>nd4j-native-platform</nd4j.backend>
+        <!--<nd4j.backend>nd4j-cuda-8.0-platform</nd4j.backend>-->
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <shadedClassifier>bin</shadedClassifier>
+
+
+        <java.version>1.8</java.version>
+        <nd4j.version>0.9.1</nd4j.version>
+        <dl4j.version>0.9.1</dl4j.version>
+        <datavec.version>0.9.1</datavec.version>
+        <arbiter.version>0.9.1</arbiter.version>
+        <rl4j.version>0.9.1</rl4j.version>
+
+        <!-- For Spark examples: change the _1 to _2 to switch between Spark 1 and Spark 2 -->
+        <dl4j.spark.version>0.9.1_spark_1</dl4j.spark.version>
+        <datavec.spark.version>0.9.1_spark_1</datavec.spark.version>
+
+        <!-- Scala binary version: DL4J's Spark and UI functionality are released with both Scala 2.10 and 2.11 support -->
+        <scala.binary.version>2.11</scala.binary.version>
+
+        <hadoop.version>2.2.0</hadoop.version>  <!-- Hadoop version used by Spark 1.6.3 and 2.2.1 (and likely others) -->
+        <guava.version>19.0</guava.version>
+        <logback.version>1.1.7</logback.version>
+        <jfreechart.version>1.0.13</jfreechart.version>
+        <jcommon.version>1.0.23</jcommon.version>
+        <maven-compiler-plugin.version>3.6.1</maven-compiler-plugin.version>
+        <maven-shade-plugin.version>2.4.3</maven-shade-plugin.version>
+        <exec-maven-plugin.version>1.4.0</exec-maven-plugin.version>
+        <maven.minimum.version>3.3.1</maven.minimum.version>
+        <javafx.version>2.2.3</javafx.version>
+        <javafx.runtime.lib.jar>${env.JAVAFX_HOME}/jfxrt.jar</javafx.runtime.lib.jar>
+        <aws.sdk.version>1.11.109</aws.sdk.version>
+        <jackson.version>2.6.6</jackson.version>
+        <scala.plugin.version>3.2.2</scala.plugin.version>
+    </properties>
+
+
+    <profiles>
+        <profile>
+            <id>OpenJFX</id>
+            <activation>
+                <jdk>1.7</jdk>
+            </activation>
+
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-enforcer-plugin</artifactId>
+                        <version>1.0.1</version>
+                        <executions>
+                            <execution>
+                                <id>enforce-default</id>
+                                <goals>
+                                    <goal>enforce</goal>
+                                </goals>
+                                <configuration>
+                                    <rules>
+                                        <requireProperty>
+                                            <property>env.JAVAFX_HOME</property>
+                                            <message>You must set the environment variable JAVAFX_HOME to the installation directory of the JavaFX 2.0 SDK! (with Oracle JDK1.7, $JRE_HOME/lib/jfxrt.jar)</message>
+                                        </requireProperty>
+
+                                    </rules>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-install-plugin</artifactId>
+                        <version>2.5.2</version>
+                        <executions>
+                            <execution>
+                                <id>install-external</id>
+                                <phase>clean</phase>
+                                <configuration>
+                                    <file>${javafx.runtime.lib.jar}</file>
+                                    <repositoryLayout>default</repositoryLayout>
+                                    <groupId>com.oracle</groupId>
+                                    <artifactId>javafx</artifactId>
+                                    <version>${javafx.version}</version>
+                                    <packaging>jar</packaging>
+                                    <generatePom>true</generatePom>
+                                </configuration>
+                                <goals>
+                                    <goal>install-file</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
     <dependencyManagement>
         <dependencies>
@@ -257,6 +352,6 @@
         </plugins>
     </build>
 
-    
+
 
 </project>

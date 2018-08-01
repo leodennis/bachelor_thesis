@@ -3,6 +3,7 @@ import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.dataset.api.DataSetPreProcessor;
 import org.nd4j.linalg.dataset.api.iterator.DataSetIterator;
+import org.nd4j.linalg.factory.Nd4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,13 +20,13 @@ public abstract class RebateDataSetIterator implements DataSetIterator {
     protected static Logger log = LoggerFactory.getLogger(RebateDataSetIterator.class);
 
     // number of inputs (features) and outputs (labels) for each rebate data
-    protected final int INPUT_VECTOR_SIZE = 4;
-    protected final int OUTPUT_VECTOR_SIZE = 1;
-    protected final int INDEX_MODEL = 0;
-    protected final int INDEX_YEAR = 1;
-    protected final int INDEX_DATE = 2;
-    protected final int INDEX_REBATE = 3;
-    protected final int INDEX_SALES = 4;
+    public static final int INPUT_VECTOR_SIZE = 4;
+    protected static final int OUTPUT_VECTOR_SIZE = 1;
+    protected static final int INDEX_MODEL = 0;
+    protected static final int INDEX_YEAR = 1;
+    protected static final int INDEX_DATE = 2;
+    protected static final int INDEX_REBATE = 3;
+    protected static final int INDEX_SALES = 4;
 
     // data lists
     protected List<RebateData> allData;
@@ -143,6 +144,10 @@ public abstract class RebateDataSetIterator implements DataSetIterator {
         return needsReset;
     }
 
+    public List<RebateData> getAllData() {
+        return allData;
+    }
+
     /**
      * Reads in all data and saves it in a list.
      * Also converts strings to numbers.
@@ -158,5 +163,27 @@ public abstract class RebateDataSetIterator implements DataSetIterator {
 
     // ---------------------------------------------- Testing ---------------------------------------------------------
 
-    abstract void testPrediction(MultiLayerNetwork net);
+    abstract void testPrediction(MultiLayerNetwork net, boolean average, boolean showResult);
+
+    public double[] predictFutureSales(MultiLayerNetwork net, INDArray[] rebates) {
+        INDArray[][] predicts = new INDArray[rebates.length][inputDays];
+
+        INDArray min = Nd4j.create(getMinArray());
+        INDArray max = Nd4j.create(getMaxArray());
+
+        CustomAverager avg = new CustomAverager(inputDays);
+
+        for (int i = 0; i < rebates.length; i++) {
+            for (int j = 0; j < inputDays; j++) {
+                predicts[i][j] = net.rnnTimeStep(rebates[i]).getRow(j).mul(max.sub(min)).add(min);
+            }
+        }
+
+        double[] pred = new double[predicts.length];
+        for (int i = 0; i < predicts.length; i++) {
+            pred[i] = predicts[i][inputDays - 1].getDouble(0);
+        }
+
+        return pred;
+    }
 }

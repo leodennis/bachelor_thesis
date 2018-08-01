@@ -341,7 +341,7 @@ public class SeparatedDataSetIterator extends RebateDataSetIterator {
     // ---------------------------------------------- Testing ---------------------------------------------------------
 
     @Override
-    void testPrediction(MultiLayerNetwork net) {
+    void testPrediction(MultiLayerNetwork net, boolean average, boolean showResult) {
         double[] predictedSales = new double[test.size()];
         double[] actualSales = new double[test.size()];
 
@@ -358,8 +358,9 @@ public class SeparatedDataSetIterator extends RebateDataSetIterator {
             actualSales[i] = actuals.getInt(0, 0, 0);
         }
 
-        log.info("Plot...");
-        PlotUtil.plot(predictedSales, actualSales, "Total Sales");
-
+        if (showResult) {
+            log.info("Plot...");
+            PlotUtil.plot(predictedSales, actualSales, "Total Sales", "Test Results");
+        }
     }
 }
